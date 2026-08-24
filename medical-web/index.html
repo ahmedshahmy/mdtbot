@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Medical Outlier Explorer</title>
+<style>
+  :root {
+    --accent: #1f6fb5;
+    --outlier: #d62728;
+    --border: #dde3ea;
+    --bg: #f5f7fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: #1c2733;
+  }
+  header {
+    background: #16324f;
+    color: #fff;
+    padding: 22px 28px;
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; opacity: .85; font-size: 13.5px; }
+  main { max-width: 1150px; margin: 0 auto; padding: 22px 20px 60px; }
+
+  .dropzone {
+    border: 2px dashed #9fb4c8;
+    border-radius: 12px;
+    background: #fff;
+    padding: 34px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .dropzone.dragover { border-color: var(--accent); background: #eef5fc; }
+  .dropzone .big { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .dropzone .small { font-size: 13px; color: #5a6b7d; }
+  .dropzone input[type=file] { display: none; }
+
+  .toolbar { display: flex; gap: 10px; margin: 14px 0 4px; flex-wrap: wrap; align-items: center; }
+  button {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: #1c2733;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13.5px;
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:hover { filter: brightness(.97); }
+  #status { font-size: 13px; color: #5a6b7d; }
+  #error {
+    display: none;
+    margin: 14px 0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: #fdecec;
+    border: 1px solid #f5b8b8;
+    color: #a12622;
+    font-size: 13.5px;
+  }
+
+  .summary {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 18px 0;
+    font-size: 14px;
+  }
+  .summary b.out { color: var(--outlier); }
+
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 18px 0;
+  }
+  .card h2 { margin: 0 0 2px; font-size: 17px; }
+  .card .sub { margin: 0 0 12px; font-size: 12.5px; color: #5a6b7d; }
+  .chart-wrap { position: relative; height: 400px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  th, td { border: 1px solid var(--border); padding: 6px 9px; text-align: left; }
+  th { background: #eef2f7; font-weight: 600; }
+  td.val { color: var(--outlier); font-weight: 700; }
+  tr.outlier-row { background: #fdf3f2; }
+  .note { font-size: 12.5px; color: #5a6b7d; margin-top: 8px; }
+  footer { text-align: center; color: #7a8898; font-size: 12.5px; padding: 0 20px 40px; }
+
+  @media print {
+    header, .dropzone, .toolbar, footer, .note-print-hide { display: none !important; }
+    main { max-width: none; padding: 0; }
+    .card { border: none; break-inside: avoid; margin: 8px 0; }
+    .chart-wrap { height: 300px; }
+    body { background: #fff; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Medical Outlier Explorer</h1>
+  <p>Upload a SQLite lab-results database — charts and outlier detection run entirely in your browser. Nothing is uploaded to any server.</p>
+</header>
+
+<main>
+  <div class="dropzone" id="dropzone">
+    <div class="big">Drop your database here, or click to choose a file</div>
+    <div class="small">SQLite file with a <code>lab_results</code> table
+      (patient_id, test_name, value, unit, ref_low, ref_high, collected_at — column-name
+      aliases like <code>test</code>, <code>result</code>, <code>date</code> are accepted).
+      A <code>patients</code> table (name, sex) is optional but recommended.</div>
+    <input type="file" id="file" accept=".db,.sqlite,.sqlite3">
+  </div>
+
+  <div class="toolbar">
+    <button id="demoBtn" class="primary">Use demo database</button>
+    <button id="printBtn" style="display:none">Print / Save as PDF</button>
+    <span id="status">Loading engine…</span>
+  </div>
+  <div id="error"></div>
+
+  <div id="results" style="display:none">
+    <div class="summary" id="summary"></div>
+    <div id="charts"></div>
+    <div class="card">
+      <h2>Outlier results</h2>
+      <div class="sub">Only values outside the clinical reference range are flagged.</div>
+      <div style="overflow-x:auto"><table id="outlierTable"></table></div>
+      <div class="note">Values inside the reference range are never flagged.</div>
+    </div>
+  </div>
+</main>
+
+<footer>Runs 100% client-side (sql.js + Chart.js) · Data never leaves your browser</footer>
+
+<script src="vendor/sql-wasm.js"></script>
+<script src="vendor/chart.umd.js"></script>
+<script src="wasm_b64.js"></script>
+<script src="demo_db.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

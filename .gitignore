@@ -1,0 +1,11 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Runtime caches / generated artifacts
+.mplconfig/
+output/
+
+# macOS
+.DS_Store
